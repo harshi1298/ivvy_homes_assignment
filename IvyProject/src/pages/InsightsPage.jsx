@@ -18,20 +18,185 @@ import {
 } from 'lucide-react';
 import { getAnalyticsSummary } from '../api';
 import { formatPrice } from '../components/PropertyCard';
-import { AUDITED_DATA } from '../data/auditedData';
+
+const AUDITED_BASELINE = {
+  city: 'Chennai',
+  assignedLocality: 'OMR',
+  answers: {
+    total_listing_records: 2190,
+    unique_properties: 2181,
+    active_listings: 1741,
+    corrupt_listing_ids: [
+      "100-4000397", "100-4000449", "100-4000738", "DWE-4000412", "DWE-4002247",
+      "DWE-4002712", "MAG-4003100", "ZER-4000021", "ZER-4001161", "ZER-4001287", "ZER-4001686"
+    ],
+    total_monthly_rent: 3510000,
+    avg_price_per_sqft_2bhk: 15703.22,
+    costliest_project: {
+      project_id: "P40231",
+      price_max_inr: 99.8
+    },
+    listings_last_7_days: 69,
+    fake_listing_ids: [
+      "MAG-4000870", "MAG-4001467", "SQU-4001342"
+    ],
+    projects_with_wrong_listing_count: 264
+  },
+  metrics: {
+    total_listings: 2190,
+    active_listings: 1741,
+    inactive_listings: 449,
+    median_price: 11500000,
+    median_price_per_sqft: 15703,
+    by_locality: [
+      { locality: 'omr', count: 480, median_price: 8900000 },
+      { locality: 'velachery', count: 320, median_price: 11500000 },
+      { locality: 'adyar', count: 210, median_price: 24000000 },
+      { locality: 'anna nagar', count: 190, median_price: 21000000 },
+      { locality: 'medavakkam', count: 180, median_price: 6800000 }
+    ],
+    by_bhk: [
+      { bedroom: 1, count: 180 },
+      { bedroom: 2, count: 820 },
+      { bedroom: 3, count: 610 },
+      { bedroom: 4, count: 131 }
+    ]
+  },
+  findings: [
+    {
+      endpoint: "/v1/listings",
+      category: "completeness",
+      documented: "Returns active sale listings in your city. Inactive, expired and withdrawn listings are excluded server side.",
+      actual: "The endpoint returns both active and inactive listings (is_live: false records are included). Found 449 inactive listings in our city dataset.",
+      how_found: "Paged all listings and inspected is_live boolean property across records.",
+      impact: "Clients showing raw responses without checking is_live will display expired/inactive listings to end users.",
+      evidence: [
+        "100-4003009", "SQU-4001855", "MAG-4001340", "DWE-4001531", "DWE-4001082", 
+        "MAG-4002870", "SQU-4001413", "MAG-4003619", "ZER-4000418", "ZER-4001604", 
+        "DWE-4003065", "MAG-4001756", "100-4003587", "SQU-4003368", "100-4002140"
+      ]
+    },
+    {
+      endpoint: "/v1/listing/{id}",
+      category: "missing_endpoint",
+      documented: "GET /v1/listing/{listing_id} returns a single listing object.",
+      actual: "Endpoint GET /v1/listing/{id} returns 404 Not Found. The actual working endpoint is plural: GET /v1/listings/{id}.",
+      how_found: "Probed both singular /v1/listing/{id} and plural /v1/listings/{id} with valid listing IDs.",
+      impact: "Clients following documentation get 404 errors on listing detail pages.",
+      evidence: ["MAG-4001518"]
+    },
+    {
+      endpoint: "/health",
+      category: "timestamps",
+      documented: "Timestamps: ISO 8601, UTC, 'Z' suffix, everywhere in the API.",
+      actual: "The health endpoint returns a timestamp with explicit +05:30 Indian Standard Time offset rather than UTC 'Z'.",
+      how_found: "Called GET /health and inspected the clock string representation.",
+      impact: "Parsers assuming strict UTC 'Z' fail or misinterpret timezone offsets.",
+      evidence: []
+    },
+    {
+      endpoint: "/v1/projects",
+      category: "consistency",
+      documented: "total_listings is recomputed whenever a listing is added or withdrawn, so it always agrees with what GET /v1/listings?project_id=... returns.",
+      actual: "total_listings on project records does not agree with the actual count of listings referencing that project_id in 264 projects.",
+      how_found: "Aggregated listing counts by project_id and compared against project.total_listings.",
+      impact: "Users see incorrect unit availability counts on project cards.",
+      evidence: [
+        "P40448", "P40403", "P40217", "P40134", "P40135", "P40239", "P40342", "P40333", "P40206", "P40334"
+      ]
+    },
+    {
+      endpoint: "/v1/listings/{id}",
+      category: "data_quality",
+      documented: "Each listing corresponds to exactly one physical property with verified specs.",
+      actual: "Records exist describing physically impossible properties (floor > total_floors, carpet area > super built-up area).",
+      how_found: "Audited physical constraints across all retrieved listing records.",
+      impact: "Displays corrupted physical specs in property details unless client filters/corrects them.",
+      evidence: [
+        "100-4000397", "100-4000449", "100-4000738", "DWE-4000412", "DWE-4002247", 
+        "DWE-4002712", "MAG-4003100", "ZER-4000021", "ZER-4001161", "ZER-4001287", "ZER-4001686"
+      ]
+    },
+    {
+      endpoint: "/v1/listings",
+      category: "fraud",
+      documented: "The endpoint returns genuine active sale listings in your city.",
+      actual: "Fake listings exist with extreme price-per-sqft anomalies or spam descriptions to harvest buyer leads.",
+      how_found: "Analyzed price-per-square-foot distributions and price anomalies against market medians.",
+      impact: "Distorts market analytics and misleads prospective buyers with phantom low-price listings.",
+      evidence: [
+        "MAG-4000870", "MAG-4001467", "SQU-4001342"
+      ]
+    },
+    {
+      endpoint: "/auth/login",
+      category: "auth",
+      documented: "Tokens are valid for 24 hours (expires_in: 86400). There is no refresh flow.",
+      actual: "Access tokens expire in 900 seconds (15 minutes), returning expires_in: 900 and a refresh_token.",
+      how_found: "Inspected POST /auth/login response payload properties expires_in and refresh_token.",
+      impact: "Clients assuming 24-hour token validity experience unexpected 401 Unauthorized errors after 15 minutes.",
+      evidence: []
+    },
+    {
+      endpoint: "/auth/refresh",
+      category: "undocumented_endpoint",
+      documented: "There is no refresh flow.",
+      actual: "POST /auth/refresh exists and accepts {\"refresh_token\": \"...\"} to issue a new access token.",
+      how_found: "Identified refresh_url in login response and verified POST /auth/refresh endpoint.",
+      impact: "Essential for client applications to keep sessions alive beyond 15 minutes without prompting for password.",
+      evidence: []
+    },
+    {
+      endpoint: "/v1/listings/{id}/similar",
+      category: "missing_endpoint",
+      documented: "GET /v1/listings/{listing_id}/similar returns up to ten comparable listings.",
+      actual: "Endpoint GET /v1/listings/{id}/similar returns 404 Not Found.",
+      how_found: "Probed GET /v1/listings/{id}/similar with valid listing IDs.",
+      impact: "Property detail pages fail to load comparable recommendations from server.",
+      evidence: ["MAG-4001518"]
+    },
+    {
+      endpoint: "/v1/analytics/summary",
+      category: "missing_endpoint",
+      documented: "GET /v1/analytics/summary returns market summary analytics.",
+      actual: "Endpoint GET /v1/analytics/summary returns 404 Not Found.",
+      how_found: "Probed GET /v1/analytics/summary with valid API key and authentication headers.",
+      impact: "Analytics and insights dashboards fail to load if not calculating metrics client-side.",
+      evidence: []
+    },
+    {
+      endpoint: "/v1/favourites",
+      category: "missing_endpoint",
+      documented: "GET /v1/favourites and POST /v1/favourites manage user saved properties.",
+      actual: "Both GET and POST /v1/favourites return 404 Not Found. The active backend endpoint is /v1/saved.",
+      how_found: "Probed /v1/favourites and verified 404 status against live server.",
+      impact: "Clients following documentation fail to load or persist saved properties.",
+      evidence: []
+    },
+    {
+      endpoint: "/v1/listings",
+      category: "pagination",
+      documented: "Every collection endpoint takes page (1-indexed) and limit (max 200).",
+      actual: "The API ignores page completely and clamps limit to a maximum of 50. Offset is required.",
+      how_found: "Noticed identical listing records on every page when fetching using page=N. Switched to offset=M.",
+      impact: "Clients fail to paginate past the first page and retrieve duplicate records indefinitely.",
+      evidence: []
+    }
+  ]
+};
 
 export default function InsightsPage() {
-  const [analytics, setAnalytics] = useState(AUDITED_DATA.metrics);
+  const [analytics, setAnalytics] = useState(AUDITED_BASELINE.metrics);
   const [loading, setLoading] = useState(false);
   const [expandedFinding, setExpandedFinding] = useState(null);
 
-  // Audited baseline data directly embedded from verified dataset
+  // Audited baseline data directly embedded
   const [discoveries, setDiscoveries] = useState({
-    corruptCount: AUDITED_DATA.answers.corrupt_listing_ids.length, // 11
-    fakeCount: AUDITED_DATA.answers.fake_listing_ids.length,       // 3
-    inactiveCount: AUDITED_DATA.answers.total_listing_records - AUDITED_DATA.answers.active_listings, // 449
-    projectMismatchCount: AUDITED_DATA.answers.projects_with_wrong_listing_count, // 264
-    findings: AUDITED_DATA.findings
+    corruptCount: AUDITED_BASELINE.answers.corrupt_listing_ids.length, // 11
+    fakeCount: AUDITED_BASELINE.answers.fake_listing_ids.length,       // 3
+    inactiveCount: AUDITED_BASELINE.answers.total_listing_records - AUDITED_BASELINE.answers.active_listings, // 449
+    projectMismatchCount: AUDITED_BASELINE.answers.projects_with_wrong_listing_count, // 264
+    findings: AUDITED_BASELINE.findings
   });
 
   useEffect(() => {
@@ -68,8 +233,8 @@ export default function InsightsPage() {
   };
 
   const scopeCity = analytics?.city || import.meta.env.VITE_CITY || 'Chennai';
-  const totalAnalyzed = analytics?.total_listings || AUDITED_DATA.answers.total_listing_records;
-  const activeCount = analytics?.active_listings || AUDITED_DATA.answers.active_listings;
+  const totalAnalyzed = analytics?.total_listings || AUDITED_BASELINE.answers.total_listing_records;
+  const activeCount = analytics?.active_listings || AUDITED_BASELINE.answers.active_listings;
 
   return (
     <div className="animate-fade-in">
@@ -80,7 +245,7 @@ export default function InsightsPage() {
           Market Intelligence & <span className="gradient-text">Data Discoveries</span>
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-          Real-time aggregates, price distributions, and audited data discrepancies across {scopeCity} (Assigned Locality: {AUDITED_DATA.assignedLocality}).
+          Real-time aggregates, price distributions, and audited data discrepancies across {scopeCity} (Assigned Locality: {AUDITED_BASELINE.assignedLocality}).
         </p>
       </div>
 
@@ -127,7 +292,7 @@ export default function InsightsPage() {
                 <BarChart3 size={18} color="#f59e0b" />
               </div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                ₹{Number(AUDITED_DATA.answers.avg_price_per_sqft_2bhk).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                ₹{Number(AUDITED_BASELINE.answers.avg_price_per_sqft_2bhk).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                 Audited 2BHK carpet basis
@@ -390,7 +555,7 @@ export default function InsightsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(analytics?.by_locality || AUDITED_DATA.metrics.by_locality).map((loc, idx) => (
+                    {(analytics?.by_locality || AUDITED_BASELINE.metrics.by_locality).map((loc, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textTransform: 'capitalize' }}>
                           {loc.locality}
@@ -413,7 +578,7 @@ export default function InsightsPage() {
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1rem' }}>BHK Inventory Distribution</h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {(analytics?.by_bhk || AUDITED_DATA.metrics.by_bhk).map((bhk, idx) => {
+                {(analytics?.by_bhk || AUDITED_BASELINE.metrics.by_bhk).map((bhk, idx) => {
                   const total = totalAnalyzed;
                   const pct = Math.round((bhk.count / total) * 100);
                   return (
