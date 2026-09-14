@@ -101,10 +101,10 @@ export default function InsightsPage() {
                 <Building2 size={18} color="var(--accent-primary)" />
               </div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, textTransform: 'capitalize' }}>
-                {analytics?.city || 'Bangalore'}
+                {analytics?.city || import.meta.env.VITE_CITY || 'Chennai'}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                Total Analyzed: {analytics?.total_listings || 1240} listings
+                Total Analyzed: {analytics?.total_listings || 1741} listings
               </div>
             </div>
 
@@ -114,7 +114,7 @@ export default function InsightsPage() {
                 <TrendingUp size={18} color="var(--success)" />
               </div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                {analytics?.median_price ? formatPrice(analytics.median_price) : '₹1.12 Cr'}
+                {analytics?.median_price ? formatPrice(analytics.median_price) : '₹1.15 Cr'}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.25rem' }}>
                 Benchmark across all localities
@@ -127,7 +127,7 @@ export default function InsightsPage() {
                 <BarChart3 size={18} color="#f59e0b" />
               </div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                ₹{analytics?.median_price_per_sqft ? Number(analytics.median_price_per_sqft).toLocaleString('en-IN') : '8,100'}
+                ₹{analytics?.median_price_per_sqft ? Number(analytics.median_price_per_sqft).toLocaleString('en-IN') : '9,991'}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                 Carpet area basis
@@ -243,11 +243,11 @@ export default function InsightsPage() {
                   </thead>
                   <tbody>
                     {(analytics?.by_locality || [
-                      { locality: 'whitefield', count: 184, median_price: 9800000 },
-                      { locality: 'koramangala', count: 120, median_price: 18500000 },
-                      { locality: 'indiranagar', count: 95, median_price: 21000000 },
-                      { locality: 'sarjapur road', count: 140, median_price: 11500000 },
-                      { locality: 'bellandur', count: 110, median_price: 12500000 }
+                      { locality: 'omr', count: 480, median_price: 8900000 },
+                      { locality: 'velachery', count: 320, median_price: 11500000 },
+                      { locality: 'adyar', count: 210, median_price: 24000000 },
+                      { locality: 'anna nagar', count: 190, median_price: 21000000 },
+                      { locality: 'medavakkam', count: 180, median_price: 6800000 }
                     ]).map((loc, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textTransform: 'capitalize' }}>

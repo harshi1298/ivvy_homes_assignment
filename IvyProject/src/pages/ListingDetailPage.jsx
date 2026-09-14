@@ -204,7 +204,7 @@ export default function ListingDetailPage({ listingId, onBack, onSelectListing, 
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)', fontSize: '1.05rem', textTransform: 'capitalize' }}>
               <MapPin size={18} color="var(--accent-primary)" />
-              <span>{locality || 'Bangalore'}</span>
+              <span>{locality || import.meta.env.VITE_CITY || 'Chennai'}</span>
               {floor !== undefined && total_floors !== undefined && (
                 <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                   • Floor {floor} of {total_floors}

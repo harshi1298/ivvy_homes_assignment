@@ -47,7 +47,7 @@ export default function ProjectCard({ project }) {
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.2rem', textTransform: 'capitalize' }}>
             <MapPin size={13} color="var(--accent-primary)" />
-            <span>{locality || 'Bangalore'}</span>
+            <span>{locality || import.meta.env.VITE_CITY || 'Chennai'}</span>
           </div>
         </div>
 

@@ -115,7 +115,7 @@ export default function PropertyCard({ listing, isFavourite, onToggleFavourite, 
           </h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'capitalize' }}>
             <MapPin size={14} color="var(--accent-primary)" />
-            <span>{locality || 'Bangalore'}</span>
+            <span>{locality || import.meta.env.VITE_CITY || 'Chennai'}</span>
             {floor !== undefined && total_floors !== undefined && (
               <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 Floor {floor}/{total_floors}
