@@ -1,10 +1,10 @@
 {
   "api_key": "IVY26-F43B898229DC",
   "candidate": {
-    "name": "Your Full Name",
-    "email": "your_email@mnnit.ac.in",
-    "repo_url": "https://github.com/your-username/ivy-homes-assignment",
-    "demo_url": "https://your-deployment-url.vercel.app"
+    "name": "Harshit Rathour",
+    "email": "harshit.20233142@mnnit.ac.in",
+    "repo_url": "https://github.com/harshi1298/ivvy_homes_assignment",
+    "demo_url": "https://ivvy-homes-assignment.onrender.com"
   },
   "answers": {
     "total_listing_records": 2190,
