@@ -1,0 +1,24 @@
+{
+  "name": "ivy-homes-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "harvest": "node scripts/harvest.js",
+    "audit": "node scripts/audit.js",
+    "solve": "node scripts/harvest.js && node scripts/audit.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.1.4"
+  }
+}
