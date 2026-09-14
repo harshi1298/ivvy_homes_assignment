@@ -31,4 +31,3 @@ dist-ssr
 # Harvested local cache
 data/
 .env.example
-submission.json
