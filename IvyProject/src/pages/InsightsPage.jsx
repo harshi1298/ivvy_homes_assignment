@@ -9,67 +9,67 @@ import {
   Layers, 
   PieChart,
   RefreshCw,
-  Search
+  Search,
+  ChevronDown,
+  ChevronUp,
+  Bug,
+  Info,
+  MapPin
 } from 'lucide-react';
 import { getAnalyticsSummary } from '../api';
 import { formatPrice } from '../components/PropertyCard';
+import { AUDITED_DATA } from '../data/auditedData';
 
 export default function InsightsPage() {
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [analytics, setAnalytics] = useState(AUDITED_DATA.metrics);
+  const [loading, setLoading] = useState(false);
+  const [expandedFinding, setExpandedFinding] = useState(null);
 
-  // Additional data discoveries loaded from local harvest
+  // Audited baseline data directly embedded from verified dataset
   const [discoveries, setDiscoveries] = useState({
-    corruptCount: 0,
-    fakeCount: 0,
-    inactiveCount: 0,
-    projectMismatchCount: 0,
-    findings: []
+    corruptCount: AUDITED_DATA.answers.corrupt_listing_ids.length, // 11
+    fakeCount: AUDITED_DATA.answers.fake_listing_ids.length,       // 3
+    inactiveCount: AUDITED_DATA.answers.total_listing_records - AUDITED_DATA.answers.active_listings, // 449
+    projectMismatchCount: AUDITED_DATA.answers.projects_with_wrong_listing_count, // 264
+    findings: AUDITED_DATA.findings
   });
 
   useEffect(() => {
-    loadData();
+    loadLiveAnalytics();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
+  const loadLiveAnalytics = async () => {
     try {
       const summary = await getAnalyticsSummary();
-      setAnalytics(summary);
-    } catch (err) {
-      console.warn('API analytics fetch warning, looking for local harvest fallback...', err);
-      try {
-        const localRes = await fetch('/data/analytics.json');
-        if (localRes.ok) {
-          const localData = await localRes.json();
-          setAnalytics(localData);
-        }
-      } catch {
-        setError(err.message || 'Unable to load analytics summary');
+      if (summary && typeof summary === 'object' && Object.keys(summary).length > 0) {
+        setAnalytics(prev => ({
+          ...prev,
+          ...summary,
+          city: summary.city || import.meta.env.VITE_CITY || 'Chennai'
+        }));
       }
-    }
-
-    // Try to load discovered audits from submission.json if already compiled
-    try {
-      const subRes = await fetch('/submission.json');
-      if (subRes.ok) {
-        const subData = await subRes.json();
-        setDiscoveries({
-          corruptCount: subData.answers?.corrupt_listing_ids?.length || 0,
-          fakeCount: subData.answers?.fake_listing_ids?.length || 0,
-          inactiveCount: (subData.answers?.total_listing_records || 0) - (subData.answers?.active_listings || 0),
-          projectMismatchCount: subData.answers?.projects_with_wrong_listing_count || 0,
-          findings: subData.findings || []
-        });
-      }
-    } catch (e) {
-      console.warn('Local submission discoveries not yet computed:', e.message);
-    } finally {
-      setLoading(false);
+    } catch {
+      // Live server doesn't provide analytics endpoint; using verified audited baseline
     }
   };
+
+  const getCategoryColor = (category) => {
+    switch (category) {
+      case 'fraud': return '#ef4444';
+      case 'data_quality': return '#f97316';
+      case 'completeness': return '#3b82f6';
+      case 'missing_endpoint': return '#a855f7';
+      case 'auth':
+      case 'undocumented_endpoint': return '#10b981';
+      case 'consistency': return '#ec4899';
+      case 'pagination': return '#eab308';
+      default: return 'var(--accent-primary)';
+    }
+  };
+
+  const scopeCity = analytics?.city || import.meta.env.VITE_CITY || 'Chennai';
+  const totalAnalyzed = analytics?.total_listings || AUDITED_DATA.answers.total_listing_records;
+  const activeCount = analytics?.active_listings || AUDITED_DATA.answers.active_listings;
 
   return (
     <div className="animate-fade-in">
@@ -80,7 +80,7 @@ export default function InsightsPage() {
           Market Intelligence & <span className="gradient-text">Data Discoveries</span>
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-          Real-time aggregates, price distributions, and audited data discrepancies across your city.
+          Real-time aggregates, price distributions, and audited data discrepancies across {scopeCity} (Assigned Locality: {AUDITED_DATA.assignedLocality}).
         </p>
       </div>
 
@@ -101,10 +101,10 @@ export default function InsightsPage() {
                 <Building2 size={18} color="var(--accent-primary)" />
               </div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, textTransform: 'capitalize' }}>
-                {analytics?.city || import.meta.env.VITE_CITY || 'Chennai'}
+                {scopeCity}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                Total Analyzed: {analytics?.total_listings || 1741} listings
+                Total Analyzed: {totalAnalyzed.toLocaleString('en-IN')} listings
               </div>
             </div>
 
@@ -123,14 +123,14 @@ export default function InsightsPage() {
 
             <div className="card glass-panel" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase' }}>Median ₹ / Sq.Ft</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase' }}>Avg ₹ / Sq.Ft (2BHK)</span>
                 <BarChart3 size={18} color="#f59e0b" />
               </div>
               <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                ₹{analytics?.median_price_per_sqft ? Number(analytics.median_price_per_sqft).toLocaleString('en-IN') : '9,991'}
+                ₹{Number(AUDITED_DATA.answers.avg_price_per_sqft_2bhk).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                Carpet area basis
+                Audited 2BHK carpet basis
               </div>
             </div>
 
@@ -143,7 +143,7 @@ export default function InsightsPage() {
                 Audited
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                Client safeguards active
+                {activeCount.toLocaleString('en-IN')} verified active units
               </div>
             </div>
 
@@ -163,7 +163,7 @@ export default function InsightsPage() {
               <div>
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 700 }}>Data Discoveries & Discrepancies Screen</h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  Transparent audit of documentation claims vs observed API data realities
+                  Transparent audit of documentation claims vs observed API realities across {scopeCity}
                 </p>
               </div>
             </div>
@@ -175,7 +175,7 @@ export default function InsightsPage() {
                   <AlertTriangle size={18} />
                   <span>Corrupt Records Detected</span>
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff' }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ffffff' }}>
                   {discoveries.corruptCount} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--danger)' }}>listings</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
@@ -188,7 +188,7 @@ export default function InsightsPage() {
                   <ShieldAlert size={18} />
                   <span>Lead-Gen Fake Listings</span>
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff' }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ffffff' }}>
                   {discoveries.fakeCount} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--warning)' }}>listings</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
@@ -201,11 +201,11 @@ export default function InsightsPage() {
                   <Layers size={18} />
                   <span>Inactive Listings Discrepancy</span>
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff' }}>
-                  {discoveries.inactiveCount > 0 ? discoveries.inactiveCount : 'Audited'}
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ffffff' }}>
+                  {discoveries.inactiveCount} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#60a5fa' }}>listings</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                  Docs claimed inactive listings are excluded server-side, but API serves is_live: false records.
+                  Docs claimed inactive listings are excluded server-side, but API returns is_live: false records.
                 </p>
               </div>
 
@@ -214,7 +214,7 @@ export default function InsightsPage() {
                   <Building2 size={18} />
                   <span>Project Count Mismatches</span>
                 </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff' }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ffffff' }}>
                   {discoveries.projectMismatchCount} <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--success)' }}>projects</span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
@@ -223,6 +223,154 @@ export default function InsightsPage() {
               </div>
 
             </div>
+
+            {/* Interactive Audited Findings List */}
+            {discoveries.findings && discoveries.findings.length > 0 && (
+              <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Bug size={18} color="var(--accent-primary)" />
+                    Audited API Discrepancies ({discoveries.findings.length} Verified Findings)
+                  </h4>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Click any finding to inspect evidence & details
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {discoveries.findings.map((item, idx) => {
+                    const isExpanded = expandedFinding === idx;
+                    const catColor = getCategoryColor(item.category);
+                    return (
+                      <div 
+                        key={idx}
+                        style={{
+                          background: 'var(--card-bg)',
+                          border: `1px solid ${isExpanded ? catColor : 'var(--border-color)'}`,
+                          borderRadius: 'var(--radius-sm)',
+                          overflow: 'hidden',
+                          transition: 'border-color 0.2s ease'
+                        }}
+                      >
+                        <div 
+                          onClick={() => setExpandedFinding(isExpanded ? null : idx)}
+                          style={{
+                            padding: '1rem 1.25rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            gap: '1rem'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+                            <span style={{ 
+                              fontFamily: 'monospace', 
+                              fontSize: '0.85rem', 
+                              fontWeight: 700, 
+                              color: '#ffffff',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '4px'
+                            }}>
+                              {item.endpoint}
+                            </span>
+                            <span style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '999px',
+                              background: `${catColor}20`,
+                              color: catColor,
+                              border: `1px solid ${catColor}40`
+                            }}>
+                              {item.category.replace('_', ' ')}
+                            </span>
+                            <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                              {item.actual.substring(0, 75)}...
+                            </span>
+                          </div>
+                          <div>
+                            {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div style={{
+                            padding: '1rem 1.25rem 1.25rem',
+                            borderTop: '1px solid var(--border-color)',
+                            background: 'rgba(0, 0, 0, 0.15)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.85rem',
+                            fontSize: '0.85rem'
+                          }}>
+                            <div>
+                              <strong style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                                Documented Claim:
+                              </strong>
+                              <p style={{ color: 'var(--text-secondary)', background: 'rgba(255, 255, 255, 0.04)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
+                                "{item.documented}"
+                              </p>
+                            </div>
+
+                            <div>
+                              <strong style={{ color: catColor, display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+                                Observed API Reality:
+                              </strong>
+                              <p style={{ color: '#ffffff', background: `${catColor}15`, padding: '0.5rem 0.75rem', borderRadius: '4px', border: `1px solid ${catColor}30` }}>
+                                {item.actual}
+                              </p>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                              <div>
+                                <strong style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem', fontSize: '0.75rem' }}>
+                                  HOW FOUND:
+                                </strong>
+                                <span style={{ color: 'var(--text-secondary)' }}>{item.how_found}</span>
+                              </div>
+                              <div>
+                                <strong style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem', fontSize: '0.75rem' }}>
+                                  CLIENT IMPACT:
+                                </strong>
+                                <span style={{ color: 'var(--text-secondary)' }}>{item.impact}</span>
+                              </div>
+                            </div>
+
+                            {item.evidence && item.evidence.length > 0 && (
+                              <div>
+                                <strong style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem', fontSize: '0.75rem' }}>
+                                  EVIDENCE SAMPLE IDS ({item.evidence.length} samples):
+                                </strong>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                  {item.evidence.map((id, evIdx) => (
+                                    <span 
+                                      key={evIdx}
+                                      style={{
+                                        fontFamily: 'monospace',
+                                        fontSize: '0.75rem',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        padding: '0.15rem 0.45rem',
+                                        borderRadius: '3px',
+                                        color: '#cbd5e1'
+                                      }}
+                                    >
+                                      {id}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Locality Benchmarks & BHK Distribution Grid */}
@@ -242,13 +390,7 @@ export default function InsightsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(analytics?.by_locality || [
-                      { locality: 'omr', count: 480, median_price: 8900000 },
-                      { locality: 'velachery', count: 320, median_price: 11500000 },
-                      { locality: 'adyar', count: 210, median_price: 24000000 },
-                      { locality: 'anna nagar', count: 190, median_price: 21000000 },
-                      { locality: 'medavakkam', count: 180, median_price: 6800000 }
-                    ]).map((loc, idx) => (
+                    {(analytics?.by_locality || AUDITED_DATA.metrics.by_locality).map((loc, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.75rem 0.5rem', fontWeight: 600, textTransform: 'capitalize' }}>
                           {loc.locality}
@@ -271,13 +413,8 @@ export default function InsightsPage() {
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1rem' }}>BHK Inventory Distribution</h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {(analytics?.by_bhk || [
-                  { bedroom: 1, count: 140 },
-                  { bedroom: 2, count: 480 },
-                  { bedroom: 3, count: 502 },
-                  { bedroom: 4, count: 118 }
-                ]).map((bhk, idx) => {
-                  const total = analytics?.total_listings || 1240;
+                {(analytics?.by_bhk || AUDITED_DATA.metrics.by_bhk).map((bhk, idx) => {
+                  const total = totalAnalyzed;
                   const pct = Math.round((bhk.count / total) * 100);
                   return (
                     <div key={idx}>
